@@ -138,6 +138,8 @@ data_om_MI$raceth_black = factor(data_om_MI$raceth_black)
 data_om_MI_black = subset(data_om_MI[which(data_om_MI$raceth_black==1),], select = -c(raceth_black))
 data_om_MI_white = subset(data_om_MI[which(data_om_MI$raceth_black==0),], select = -c(raceth_black))
 
+get_match_data <- get_matches(m.out2)
+write.csv(get_match_data,".\\optimal_matched_vital_data.csv", row.names = FALSE)
 
 ### Decision Tree After matching ----
 
