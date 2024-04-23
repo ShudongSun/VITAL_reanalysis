@@ -541,3 +541,98 @@ CI_higher = round(exp(as.numeric(result[,1])+1.96*as.numeric(result[,2])),keep_d
 result["OR (95% CI)"] = paste(ORs, " (",CI_lower,", ", CI_higher,")",sep="")
 
 print(result)
+
+
+### Kaplan-Meier Survival Curves ----
+
+library(haven)
+library(survival)
+library(survminer)
+library(tidyverse)
+
+# # Convert VITAL Trial data downloaded from Project Data Sphere to csv format using haven package
+# vital <- read_sas("vital_data_2019.sas7bdat")
+# write.csv(vital, file = "vital_data_2019.csv", row.names = F)
+
+# Read in VITAL study data downloaded from Project Data Sphere and coverted to csv
+vital <- read.csv(file = '..//data//vital_data_2019.csv')
+
+# Read in file of participants chosen by optimal pairs matching algorithm
+# Chosen subjects are identified by the number corresponding to the row in "vital_data_2019" file.
+pairs_file <- ".//optimal_matched_vital_data.csv"
+pairs <- read.csv(pairs_file)
+
+# Extract matched African American and European American participants from vital data.frame by row numbers
+vital <- vital %>% add_column("row_num" = rownames(vital), .before = 1)
+vital_in_pairs <- vital %>% filter(row_num %in% pairs$id)
+table(vital_in_pairs$raceth) # shows 3766 each of Black and White subjects
+
+
+# create a version of the ggsurvplot_facet function with adjustable pval.size parameter
+# (based on https://stackoverflow.com/questions/59979718/why-is-pval-size-ignored-by-ggsurvplot-facet)
+ggsurvplot_facet2 <- function(pval.size = 5, ...)
+{
+  newcall <- bquote(
+    p <- p + geom_text(data = pvals.df, aes(x = pval.x, y = pval.y, 
+                                            label = pval.txt), size = .(pval.size), hjust = 0)
+  )
+  
+  body(ggsurvplot_facet)[[20]][[3]][[8]] <- newcall
+  ggsurvplot_facet(...)
+}
+
+
+########## Plot Kaplan-Meier Curves for matched samples only, faceted by race ###########
+# plot Kaplan-Meier curves as in VITAL study reanalysis paper but with only the matched participants
+surv.mi.both.paired <- survfit(Surv(miyears, totmi)~fishoilactive, data=vital_in_pairs)
+facet_plt.paired.MI.race_only <- ggsurvplot_facet2(surv.mi.both.paired, vital_in_pairs, 
+                                                   facet.by = c("raceth"),
+                                                   ylim = c(0.93,1), 
+                                                   legend.labs = c("placebo", "n-3 HUFA"), 
+                                                   panel.labs = list(raceth = c("White", "Black")),
+                                                   short.panel.labs = T,
+                                                   ylab = "MI-Free Survival",
+                                                   xlab = "Time (years)",
+                                                   conf.int = TRUE,
+                                                   palette = c("orange", "dodgerblue"),
+                                                   pval = T, pval.coord = c(0, 0.94), pval.size = 3,
+                                                   panel.labs.font = list(size = 8),
+                                                   font.x = 10, font.y = 10, font.tickslab = 8,
+                                                   legend.title = "")
+
+
+#### Make each facet a subplot with included risk table for arrangement in PowerPoint
+
+# Make a list of panels for each racial group
+df_race_facet_split <- vital_in_pairs %>% group_by(raceth) %>% group_split()
+
+# Make a list of survfit objects
+fit_race_facets <- lapply(df_race_facet_split, 
+                          function(x) survfit(Surv(miyears, totmi)~fishoilactive, data = x))
+
+# Make a list of plots from ggsurvplot
+plot_race_facets <- lapply(1:length(fit_race_facets),
+                           function(x) {
+                             ggsurvplot(fit_race_facets[[x]], df_race_facet_split[[x]],
+                                        legend.labs = c("placebo", "n-3 HUFA"),
+                                        ylab = "", xlab = "Time (years)", tables.theme = theme_cleantable(),
+                                        font.x = c(14, "plain", "black"),
+                                        conf.int = TRUE, palette = c("orange", "dodgerblue"), 
+                                        pval = TRUE, pval.coord = c(0, 0.975),
+                                        ylim = c(0.97,1), risk.table = TRUE, break.time.by = 0.5,
+                                        legend = "none", risk.table.fontsize = 6, font.tickslab = c(14, "plain", "black"))
+                           })
+
+# Increase size of y-axis labels (placebo & fish oil) on the risk table
+plot_race_facets <- lapply(plot_race_facets, function(x) {
+  x$table$theme$axis.text.y$size <- 17
+  return(x) } )
+
+# Print each facet to a separate tiff file for arrangement in PowerPoint
+tiff("race_paired_1.tiff", width = 600, height = 501)
+plot_race_facets[[1]]
+dev.off()
+
+tiff("race_paired_2.tiff", width = 600, height = 501)
+plot_race_facets[[2]]
+dev.off()
