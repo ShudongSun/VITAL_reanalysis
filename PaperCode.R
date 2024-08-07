@@ -109,7 +109,7 @@ summary(m.out4)
 # plot(summary(m.out4))
 
 
-# save(m.out1,m.out2,m.out3, file="./m.out123_majorVD.Rdata")
+# save(m.out1,m.out2,m.out3, file="./m.out123.Rdata")
 # save(m.out4, file="./m.out4.Rdata")
 
 
@@ -128,7 +128,7 @@ data = data_m3_MI
 data$raceth = ifelse(data$raceth==2,1,0)
 names(data)[which(names(data)=="raceth")] = "raceth_black"
 
-# load(".//m.out123.Rdata")
+load(".//m.out123.Rdata")
 
 m.data2 <- match.data(m.out2)
 data_om_MI = m.data2[,1:(length(m.data2)-3)]
